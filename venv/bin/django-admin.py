@@ -1,4 +1,4 @@
-#!/Users/kimhyung-won/Downloads/내문서/-/python_Django/venv/bin/python
+#!/Users/kimhyung-won/Downloads/내문서/python_Django/venv/bin/python
 # When the django-admin.py deprecation ends, remove this script.
 import warnings
 
