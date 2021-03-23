@@ -4,7 +4,7 @@ from pybo.models import Question, Answer
 class QuestionForm(forms.ModelForm):
     class Meta:
         model = Question
-        fields = ['subject', 'content']
+        fields = ['subject', 'content'] # 질문이 등록된 후 필드안의 속성들만 보여줌 (제목, 내용만), 개별적으로 정해짐
 
         labels = {
             'subject': '제목',

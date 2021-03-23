@@ -43,7 +43,8 @@
     </div>
     {% endif %}
         <div class="form-group">
-            <textarea name="content" id="content" class="form-control" rows="10"></textarea>
+           <textarea {% if not user.is_authenticated %}disabled{% endif %}  <!--로그아웃 상태에서 아예 답변을 작성할 수 없도록 만드는 코드 -->
+              name="content" id="content" class="form-control" rows="10"></textarea>
         </div>
         <input type="submit" value="답변등록" class="btn btn-primary">
     </form>
