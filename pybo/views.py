@@ -3,12 +3,13 @@ from django.shortcuts import render
 # Create your views here.
 
 from django.http import HttpResponse
-from .models import Question
+from .models import Question,Answer,Comment
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
-from .forms import QuestionForm, AnswerForm
+from .forms import QuestionForm, AnswerForm, CommentForm
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 
 def index(requeset):
 
@@ -37,7 +38,7 @@ def detail(request, question_id):
 
 @login_required(login_url='common:login')
 # 로그인이 안되어져있으면 로그인 화면으로 이동
-# request.user가 User 객체가 아닌 AnonymousUser 객체먄 오류 발생하므로 해당 어노태이션 필요
+# request.user가 User 객체가 아닌 AnonymousUser 객체면 오류 발생하므로 해당 어노태이션 필요
 # 어노테이션 사용하면 로그아웃 상태에서 '질문 등록하기'를 눌러 로그인 화면으로 전환된 상태에서 웹 브라우저 주소창의 URL을 보면 next 파라미터가 있음.
 # 이는 로그인 성공 후 next 파라미터에 있는 URL로 페이지를 이동해야 한다는 의미
 # ****로그인 html 탬플릿에 <input type="hidden" name="next" value="{{ next }}"> 넣어줘 next url로 가짐.
@@ -47,7 +48,7 @@ def answer_create(request, question_id):
     if request.method == 'POST':
         form = AnswerForm(request.POST)
         if form.is_valid():
-            answer = form.save(commit = False)
+            answer = form.save(commit=False)
             answer.create_date = timezone.now()
             answer.question = question
             answer.author = request.user    # author에 유저정보 포함
@@ -96,7 +97,210 @@ def question_create(request):
     # form에 아무 내용 없으면 html에 default_if_none:''으로 빈공간 출력해줌
     # 따라서 유효성 검사에서 통과 못하면 form을 다시 보내줘야하는 상황이오고 html에서 이 form을 기반으로 렌더링이 다시되므로
     # 처음 진입시에도 form = QuestionForm() 이렇게 빈객체를 선언해줘서 빈 form을 보내주는 것. 안그럼 오류남
-    # 위의 코드가 최적화가 잘 되어 있어서 과정에 대한 이해가 어려움.
+
+
+
+
+
+@login_required(login_url='common:login')
+def question_modify(request, question_id):
+    question = get_object_or_404(Question, pk=question_id)
+    if request.user != question.author:
+        messages.error(request,'수정권한이 없습니다. ')
+        return redirect('pybo:detail', question_id=question.id)
+
+    if request.method == 'POST':
+        form = QuestionForm(request.POST, instance=question)
+        # instance의 의미 : 조회한 질문 question을 기본값으로 하여 화면으로 전달받은 입력값들을 덮어써서 QuestionForm을 생성하라는 의미
+        if form.is_valid():
+            question = form.save(commit=False)
+            question.author = request.user
+            question.modified_date = timezone.now() #수정 한 날
+            question.save()
+            return redirect('pybo:detail', question_id=question.id)
+    else:
+        form = QuestionForm(instance=question)
+    context = {'form': form}
+    return render(request,'pybo/question_form.html', context)
+
+
+@login_required(login_url='common:login')
+def question_delete(request, question_id):
+    """
+    pybo 질문삭제
+    """
+    question = get_object_or_404(Question, pk=question_id)
+    if request.user != question.author:
+        messages.error(request, '삭제권한이 없습니다.')
+        return redirect('pybo:detail', question_id=question.id)
+    question.delete()
+    return redirect('pybo:index')
+
+
+@login_required(login_url='common:login')
+def answer_delete(request, answer_id):
+
+    answer = get_object_or_404(Answer, pk=answer_id)
+
+    if request.user != answer.author:
+        messages.error(request, '삭제권한이 없습니다.')
+        return redirect('pybo:detail', question_id= answer.question.id)
+    else:
+        answer.delete()
+    return redirect('pybo:detail', question_id=answer.question.id)
+
+@login_required(login_url='common:login')
+def answer_modify(request, answer_id):
+
+    answer = get_object_or_404(Answer, pk=answer_id)
+    if request.user != answer.author:
+        messages.error(request, '삭제권한이 없습니다.')
+        return redirect('pybo:detail', question_id = answer.question.id)
+
+    if request.method == 'POST':
+        form = AnswerForm(request.POST, instance=answer)
+        if form.is_valid():
+
+            answer = form.save(commit=False)
+            answer.author = request.user
+            answer.modified_date = timezone.now()
+            answer.save()
+            return redirect('pybo:detail', question_id = answer.question.id)
+    else:
+        form = AnswerForm(instance=answer)
+    context = {'form': form, 'answer':answer}
+    return render(request, 'pybo/answer_form.html', context)
+
+
+@login_required(login_url='common:login')
+def comment_create_question(request, question_id):
+    """
+    pybo 질문댓글등록
+    """
+    question = get_object_or_404(Question, pk=question_id)
+    if request.method == "POST":
+        form = CommentForm(request.POST)
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.author = request.user
+            comment.create_date = timezone.now()
+            comment.question = question
+            comment.save()
+            return redirect('pybo:detail', question_id=question.id)
+    else:
+        form = CommentForm()
+    context = {'form': form}
+    return render(request, 'pybo/comment_form.html', context)
+
+
+@login_required(login_url='common:login')
+def comment_modify_question(request, comment_id):
+    """
+    pybo 질문댓글수정
+    """
+    comment = get_object_or_404(Comment, pk=comment_id)
+    if request.user != comment.author:
+        messages.error(request, '댓글수정권한이 없습니다. ')
+        return redirect('pybo:detail', question_id=comment.question.id)
+
+    if request.method == "POST":
+        form = CommentForm(request.POST, instance=comment)
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.author = request.user
+            comment.modify_date = timezone.now()
+            comment.save()
+            return redirect('pybo:detail', question_id=comment.question.id)
+    else:
+        form = CommentForm(instance=comment)
+    context = {'form': form}
+    return render(request, 'pybo/comment_form.html', context)
+
+
+@login_required(login_url='common:login')
+def comment_delete_question(request, comment_id):
+    """
+    pybo 질문댓글삭제
+    """
+    comment = get_object_or_404(Comment, pk=comment_id)
+    if request.user != comment.author:
+        messages.error(request, '댓글삭제권한이 없습니다. ')
+        return redirect('pybo:detail', question_id=comment.question.id)
+    else:
+        comment.delete()
+    return redirect('pybo:detail', question_id=comment.question.id)
+
+@login_required(login_url='common:login')
+def comment_create_answer(request, answer_id):
+    """
+    pybo 답글댓글등록
+    """
+    answer = get_object_or_404(Answer, pk=answer_id)
+    if request.method == "POST":
+        form = CommentForm(request.POST)
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.author = request.user
+            comment.create_date = timezone.now()
+            comment.answer = answer
+            comment.save()
+            return redirect('pybo:detail', question_id=comment.answer.question.id)
+    else:
+        form = CommentForm()
+    context = {'form': form}
+    return render(request, 'pybo/comment_form.html', context)
+
+
+@login_required(login_url='common:login')
+def comment_modify_answer(request, comment_id):
+    """
+    pybo 답글댓글수정
+    """
+    comment = get_object_or_404(Comment, pk=comment_id)
+    if request.user != comment.author:
+        messages.error(request, '댓글수정권한이 없습니다')
+        return redirect('pybo:detail', question_id=comment.answer.question.id)
+
+    if request.method == "POST":
+        form = CommentForm(request.POST, instance=comment)
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.author = request.user
+            comment.modify_date = timezone.now()
+            comment.save()
+            return redirect('pybo:detail', question_id=comment.answer.question.id)
+    else:
+        form = CommentForm(instance=comment)
+    context = {'form': form}
+    return render(request, 'pybo/comment_form.html', context)
+
+
+@login_required(login_url='common:login')
+def comment_delete_answer(request, comment_id):
+    """
+    pybo 답글댓글삭제
+    """
+    comment = get_object_or_404(Comment, pk=comment_id)
+    if request.user != comment.author:
+        messages.error(request, '댓글삭제권한이 없습니다')
+        return redirect('pybo:detail', question_id=comment.answer.question.id)
+    else:
+        comment.delete()
+    return redirect('pybo:detail', question_id=comment.answer.question.id)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 '''
 제너릭뷰
