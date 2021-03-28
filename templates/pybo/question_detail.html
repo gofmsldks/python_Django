@@ -1,4 +1,6 @@
 {% extends 'base.html' %}
+{% load pybo_filter %}
+
 {% block content %}
 
 
@@ -29,7 +31,7 @@
         <div class="col-11"> <!-- 질문영역 -->
             <div class="card">
                 <div class="card-body">
-                    <div class="card-text" style="white-space: pre-line;">{{ question.content }}</div>
+                    <div class="card-text">{{ question.content|mark }}</div><!-- 마크다운 필터 적용  -->
                     <div class="d-flex justify-content-end">
                         {% if question.modify_date %}
                         <div class="badge badge-light p-2 text-left mx-3">
